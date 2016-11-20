@@ -1,59 +1,46 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Stack;
 
 /**
- * Created by max on 18.11.16.
+ * This class tries to build a decision tree out of training examples.
+ * It is used in it's main method to solve the P.3 programming assignment for the Machine Learning module.
+ * written by Maximilian Deubel
  */
 public class DecisionTree {
     private String[] classes;
     private String[][] attributes;
+    private String[] attributeNames;
     private Node root;
     private int[][] trainingData;
 
-    abstract class Node {
-        abstract int getClass_(int[] attributes);
-
-        ArrayList<Integer> chosenOnes;
-        double entropyOfChosen;
+    /**
+     * initializes a new decision tree
+     *
+     * @param classes        classes to assign to the input
+     * @param attributes     attributes to decide on
+     * @param trainingData   training examples for building the tree
+     * @param attributeNames names of the attributes
+     */
+    public DecisionTree(String[] classes, String[][] attributes, int[][] trainingData, String[] attributeNames) {
+        this.classes = classes;
+        this.attributes = attributes;
+        this.trainingData = trainingData;
+        this.attributeNames = attributeNames;
     }
 
-    private class LeafNode extends Node {
-        int my_class;
-
-        int getClass_(int[] attributes) {
-            return my_class;
-        }
-
-        LeafNode(int c, ArrayList<Integer> chosenOnes) {
-            this.my_class = c;
-            this.chosenOnes = chosenOnes;
-            this.entropyOfChosen = getEntropy(chosenOnes);
-        }
-    }
-
-    private class InternalNode extends Node {
-        int my_attribute;
-        Node[] children;
-
-        int getClass_(int[] attributes) {
-            return children[attributes[my_attribute]].getClass_(attributes);
-        }
-
-        InternalNode(int attr, ArrayList<Integer> chosenOnes) {
-            this.my_attribute = attr;
-            this.chosenOnes = chosenOnes;
-            this.entropyOfChosen = getEntropy(chosenOnes);
-            this.children = new Node[attributes[my_attribute].length];
-        }
-    }
-
+    /**
+     * loads a line from the .data file to an entry of the trainingData array
+     *
+     * @param line         input string
+     * @param classes      classes for string comparison
+     * @param attributes   attributes for string comparison
+     * @param trainingData array to save training examples
+     * @param l            current line number
+     */
     private static void loadLine(String line, String[] classes, String[][] attributes, int[][] trainingData, int l) {
         String[] keys = line.split(",");
-        //System.out.println(Arrays.toString(keys));
         assert keys.length == attributes.length + 1;
         for (int i = 0; i < attributes.length; i++) {
             for (int j = 0; j < attributes[i].length; j++) {
@@ -71,90 +58,14 @@ public class DecisionTree {
         }
     }
 
-    private double getEntropy(ArrayList<Integer> chosenOnes) {
-        int[] c_classes = new int[classes.length];
-        double result = 0;
-        for (int i = 0; i < chosenOnes.size(); i++) {
-            c_classes[trainingData[chosenOnes.get(i)][trainingData[i].length - 1]]++;
-        }
-        for (int i : c_classes) {
-            double a = i / (double) chosenOnes.size();
-            if (a != 0) {
-                result -= a * Math.log(a) / Math.log(classes.length);
-            }
-        }
-        return result;
-    }
-
-    private double getInformationGain(ArrayList<Integer> chosenOnes, int attribute, double entropyOfChosen) {
-        double result = entropyOfChosen;
-        ArrayList<ArrayList<Integer>> chosenbyAttribute = seperateByAttribute(chosenOnes, attribute);
-        for (ArrayList<Integer> chosen : chosenbyAttribute) {
-            result -= getEntropy(chosen) * chosen.size() / chosenOnes.size();
-        }
-        return result;
-    }
-
-    private ArrayList<ArrayList<Integer>> seperateByAttribute(ArrayList<Integer> chosenOnes, int attribute) {
-        ArrayList<ArrayList<Integer>> chosenbyAttribute = new ArrayList<>();
-        for (int i = 0; i < attributes[attribute].length; i++) {
-            chosenbyAttribute.add(new ArrayList<>());
-        }
-        for (Integer chosenOne : chosenOnes) {
-            chosenbyAttribute.get(trainingData[chosenOne][attribute]).add(chosenOne);
-        }
-        return chosenbyAttribute;
-    }
-
-    private Node getNodeWithMostGain(ArrayList<Integer> chosenOnes, double entropyOfChosen) {
-        if (entropyOfChosen == 0) {
-            assert trainingData.length > 0;
-            return new LeafNode(trainingData[chosenOnes.get(0)][classes.length], chosenOnes);
-        } else {
-            int max = 0;
-            double maxGain = 0;
-            for (int i = 0; i < attributes.length; i++) {
-                double gain = getInformationGain(chosenOnes, i, entropyOfChosen);
-                if (gain > maxGain) {
-                    max = i;
-                    maxGain = gain;
-                }
-            }
-            return new InternalNode(max, chosenOnes);
-        }
-    }
-
-    public void ID3() {
-        ArrayList<Integer> chosen = new ArrayList<>(trainingData.length);
-        for (int i = 0; i < trainingData.length; i++) {
-            chosen.add(i);
-        }
-        root = getNodeWithMostGain(chosen, getEntropy(chosen));
-
-        ArrayDeque<Node> workingQueue = new ArrayDeque<>();
-        workingQueue.add(root);
-        while (!workingQueue.isEmpty()) {
-            if (workingQueue.peek().getClass() != (LeafNode.class)) {
-                InternalNode current = (InternalNode) workingQueue.poll();
-                for (int i = 0; i < attributes[current.my_attribute].length; i++) {
-                    ArrayList<ArrayList<Integer>> chosenbyAttribute = seperateByAttribute(current.chosenOnes, current.my_attribute);
-                    current.children[i] = getNodeWithMostGain(chosenbyAttribute.get(i), getEntropy(chosenbyAttribute.get(i)));
-                    workingQueue.add(current.children[i]);
-                    System.out.println("added Node " + current.children[i]);
-                }
-            } else {
-                workingQueue.poll();
-            }
-        }
-    }
-
-    public DecisionTree(String[] classes, String[][] attributes, int[][] trainingData) {
-        this.classes = classes;
-        this.attributes = attributes;
-        this.trainingData = trainingData;
-    }
-
+    /**
+     * entry point
+     * contains all the specific input related to the assignment
+     *
+     * @param args not used
+     */
     public static void main(String[] args) {
+        //load the car_data examples
         String[] classes = new String[]{
                 "unacc", "acc", "good", "vgood"
         };
@@ -166,7 +77,9 @@ public class DecisionTree {
                 {"small", "med", "big"},
                 {"low", "med", "high"}
         };
+        String[] attributeNames = {"buying", "maint", "doors", "persons", "lug_boot", "safety"};
         int[][] trainingData = new int[1728][attributes.length + 1];
+        System.out.println("Loading Training Data...");
         try {
             try (BufferedReader br = new BufferedReader(new FileReader("car.data"))) {
                 int i = 0;
@@ -179,7 +92,296 @@ public class DecisionTree {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        DecisionTree d = new DecisionTree(classes, attributes, trainingData);
-        d.ID3();
+        System.out.println("Creating Decision Tree via ID3...");
+        DecisionTree d = new DecisionTree(classes, attributes, trainingData, attributeNames); //create new decision tree with car_data
+        d.ID3(); //run ID3 algorithm to build up the tree
+        System.out.println("Writing XML File...");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("test.xml"))) {
+            writer.write(d.toXML());
+            writer.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * @param chosenOnes set of training examples (indexes) to reach this node
+     * @return entropy of the given set
+     */
+    private double getEntropy(ArrayList<Integer> chosenOnes) {
+        int[] classDistribution = new int[classes.length];
+        for (int i = 0; i < chosenOnes.size(); i++) {
+            classDistribution[trainingData[chosenOnes.get(i)][trainingData[i].length - 1]]++;
+        }
+        return getEntropy(classDistribution, chosenOnes.size());
+    }
+
+    /**
+     * @param classDistribution array of sums of instances by class
+     * @param size              total instances
+     * @return entropy of the given set
+     */
+    private double getEntropy(int[] classDistribution, int size) {
+        double result = 0;
+        for (int i : classDistribution) {
+            double a = i / (double) size;
+            if (a != 0) {
+                result -= a * Math.log(a) / Math.log(classes.length);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @param chosenOnes      set of training examples (indexes)
+     * @param attribute       attribute, on which the information gain is calculated
+     * @param entropyOfChosen entropy of chosenOnes
+     * @return information gain of the given training examples with respect of a particular attribute
+     */
+    private double getInformationGain(ArrayList<Integer> chosenOnes, int attribute, double entropyOfChosen) {
+        double result = entropyOfChosen;
+        ArrayList<ArrayList<Integer>> chosenbyAttribute = seperateByAttribute(chosenOnes, attribute);
+        for (ArrayList<Integer> chosen : chosenbyAttribute) {
+            result -= getEntropy(chosen) * chosen.size() / chosenOnes.size();
+        }
+        return result;
+    }
+
+    /**
+     * @param chosenOnes set of training examples (indexes)
+     * @param attribute  attribute to seperate the examples on
+     * @return an ArrayList of the separated sets according to the value of the given attribute
+     */
+    private ArrayList<ArrayList<Integer>> seperateByAttribute(ArrayList<Integer> chosenOnes, int attribute) {
+        ArrayList<ArrayList<Integer>> chosenbyAttribute = new ArrayList<>();
+        for (int i = 0; i < attributes[attribute].length; i++) {
+            chosenbyAttribute.add(new ArrayList<>());
+        }
+        for (Integer chosenOne : chosenOnes) {
+            chosenbyAttribute.get(trainingData[chosenOne][attribute]).add(chosenOne);
+        }
+        return chosenbyAttribute;
+    }
+
+    /**
+     * @param chosenOnes      set of training examples (indexes)
+     * @param entropyOfChosen entropy of chosenOnes
+     * @param parent          parent node
+     * @return a new node that parts the given training examples best according to information gain
+     */
+    private Node getNodeWithMostGain(ArrayList<Integer> chosenOnes, double entropyOfChosen, InternalNode parent) {
+        if (entropyOfChosen == 0) {
+            assert trainingData.length > 0;
+            return new LeafNode(trainingData[chosenOnes.get(0)][attributes.length], chosenOnes, parent);
+        } else {
+            int max = 0;
+            double maxGain = 0;
+            for (int i = 0; i < attributes.length; i++) {
+                double gain = getInformationGain(chosenOnes, i, entropyOfChosen);
+                if (gain > maxGain) {
+                    max = i;
+                    maxGain = gain;
+                }
+            }
+            return new InternalNode(max, chosenOnes, parent);
+        }
+    }
+
+    /**
+     * implementation of the "ID3 Top-Down Induction" algorithm described in the lecture notes
+     */
+    public void ID3() {
+        //root node gets initialized
+        ArrayList<Integer> chosen = new ArrayList<>(trainingData.length);
+        for (int i = 0; i < trainingData.length; i++) {
+            chosen.add(i);
+        }
+        root = getNodeWithMostGain(chosen, getEntropy(chosen), null);
+
+        ArrayDeque<Node> workingQueue = new ArrayDeque<>(); //queue to hold current leaves
+        workingQueue.add(root);
+        while (!workingQueue.isEmpty()) {
+            if (workingQueue.peek().getClass() != (LeafNode.class)) { //if we need to generate children for the current node
+                InternalNode current = (InternalNode) workingQueue.poll();
+                for (int i = 0; i < attributes[current.my_attribute].length; i++) {
+                    ArrayList<ArrayList<Integer>> chosenbyAttribute = seperateByAttribute(current.chosenOnes, current.my_attribute);
+                    current.children[i] = getNodeWithMostGain(chosenbyAttribute.get(i), getEntropy(chosenbyAttribute.get(i)), current);
+                    workingQueue.add(current.children[i]);
+                    //System.out.println("added Node " + current.children[i]);
+                }
+            } else {
+                workingQueue.poll();
+            }
+        }
+    }
+
+    /**
+     * converts decision tree to XML string
+     *
+     * @return XML string
+     */
+    public String toXML() {
+        StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n");
+
+        sb.append(nodeToXML(root, 0, 0)).append("\n");
+        if (root.getClass() == InternalNode.class) {
+            int numtabs = 0;
+            Stack<Node> working_stack = new Stack<>();
+            Stack<Integer> attrValStack = new Stack<>();
+            InternalNode current = (InternalNode) root;
+
+            for (int i = 0; i < current.children.length; i++) {
+                working_stack.push(current.children[i]);
+                attrValStack.push(i);
+            }
+            numtabs++;
+            while (!working_stack.isEmpty()) {
+                if (working_stack.peek() == null) {
+                    working_stack.pop();
+                    numtabs--;
+                    for (int i = 0; i < numtabs; i++) {
+                        sb.append("\t");
+                    }
+                    sb.append("</node>\n");
+                } else if (working_stack.peek().getClass() == InternalNode.class) {
+                    InternalNode c = (InternalNode) working_stack.pop();
+                    sb.append(nodeToXML(c, attrValStack.pop(), numtabs)).append("\n");
+                    numtabs++;
+                    working_stack.push(null);
+                    for (int i = 0; i < c.children.length; i++) {
+                        working_stack.push(c.children[i]);
+                        attrValStack.push(i);
+                    }
+                } else {
+                    LeafNode c = (LeafNode) working_stack.pop();
+                    sb.append(nodeToXML(c, attrValStack.pop(), numtabs)).append(classes[c.my_class]).append("</node>\n");
+                }
+            }
+        }
+        sb.append("</tree>");
+        return sb.toString();
+    }
+
+    /**
+     * XML creation helper method
+     *
+     * @param n          node to convert
+     * @param attr_value value of attribute of parent node to get to this node
+     * @param numTabs    number of tabs to append in front
+     * @return part of the XML string
+     */
+    private String nodeToXML(Node n, int attr_value, int numTabs) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < numTabs; i++) {
+            sb.append("\t");
+        }
+        if (n.parent == null) {
+            sb.append("<tree");
+        } else {
+            sb.append("<node");
+        }
+        sb.append(" classes=\"");
+        ArrayList<String> classStrings = new ArrayList<>();
+        for (int i = 0; i < this.classes.length; i++) {
+            if (n.classDistribution[i] > 0) {
+                classStrings.add(classes[i] + ":" + n.classDistribution[i]);
+            }
+        }
+        sb.append(classStrings.get(0));
+        for (int i = 1; i < classStrings.size(); i++) {
+            sb.append(",");
+            sb.append(classStrings.get(i));
+        }
+        sb.append("\" entropy=\"").append(n.entropyOfChosen).append("\"");
+        if (n.parent != null) {
+            sb.append(' ').append(attributeNames[n.parent.my_attribute]).append("=\"").append(attributes[n.parent.my_attribute][attr_value]).append("\"");
+        }
+        sb.append(">");
+        return sb.toString();
+    }
+
+    /**
+     * basic node class for building the decision tree
+     */
+    abstract class Node {
+        InternalNode parent;
+        ArrayList<Integer> chosenOnes;
+        int[] classDistribution;
+        double entropyOfChosen;
+        /**
+         * basic initialization for nodes
+         *
+         * @param parent     parent node
+         * @param chosenOnes set of training examples (indexes) to reach this node
+         */
+        Node(InternalNode parent, ArrayList<Integer> chosenOnes) {
+            this.parent = parent;
+            this.chosenOnes = chosenOnes;
+            this.classDistribution = new int[classes.length];
+            for (int i = 0; i < chosenOnes.size(); i++) {
+                classDistribution[trainingData[chosenOnes.get(i)][trainingData[i].length - 1]]++;
+            }
+            this.entropyOfChosen = getEntropy(classDistribution, chosenOnes.size());
+        }
+
+        abstract int getClass_(int[] attributes);
+    }
+
+    /**
+     * leaf node class for building the decision tree
+     */
+    private class LeafNode extends Node {
+        int my_class;
+
+        /**
+         * initializes a leaf of the decision tree
+         *
+         * @param c          class, which becomes the output, whenever this node is reached
+         * @param chosenOnes set of training examples (indexes) to reach this node
+         * @param parent     parent node
+         */
+        LeafNode(int c, ArrayList<Integer> chosenOnes, InternalNode parent) {
+            super(parent, chosenOnes);
+            this.my_class = c;
+        }
+
+        /**
+         * @param attributes not used here
+         * @return class of the leaf
+         */
+        @Override
+        int getClass_(int[] attributes) {
+            return my_class;
+        }
+    }
+
+    /**
+     * internal node class for building the decision tree
+     */
+    private class InternalNode extends Node {
+        int my_attribute;
+        Node[] children;
+
+        /**
+         * @param attr       attribute this node uses to decide
+         * @param chosenOnes set of training examples (indexes) to reach this node
+         * @param parent     parent node
+         */
+        InternalNode(int attr, ArrayList<Integer> chosenOnes, InternalNode parent) {
+            super(parent, chosenOnes);
+            this.my_attribute = attr;
+            this.children = new Node[attributes[my_attribute].length];
+        }
+
+        /**
+         * chooses the right child with respect to the attribute of the node
+         *
+         * @param attributes array of the attributes to decide on
+         * @return class the tree assigns to the particular array of attributes
+         */
+        @Override
+        int getClass_(int[] attributes) {
+            return children[attributes[my_attribute]].getClass_(attributes);
+        }
     }
 }
