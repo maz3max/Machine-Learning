@@ -6,6 +6,13 @@ import java.util.Stack;
 /**
  * This class tries to build a decision tree out of training examples.
  * It is used in it's main method to solve the P.3 programming assignment for the Machine Learning module.
+ * <p>
+ * The most important methods are:
+ * public void ID3()
+ * private double getEntropy(*)
+ * private double getInformationGain(*)
+ * private Node getNodeWithMostGain(*)
+ * <p>
  * written by Maximilian Deubel
  */
 public class DecisionTree {
@@ -41,19 +48,20 @@ public class DecisionTree {
      */
     private static void loadLine(String line, String[] classes, String[][] attributes, int[][] trainingData, int l) {
         String[] keys = line.split(",");
-        assert keys.length == attributes.length + 1;
-        for (int i = 0; i < attributes.length; i++) {
-            for (int j = 0; j < attributes[i].length; j++) {
-                if (keys[i].equals(attributes[i][j])) {
-                    trainingData[l][i] = j;
-                    break;
+        if (keys.length == attributes.length + 1) {
+            for (int i = 0; i < attributes.length; i++) {
+                for (int j = 0; j < attributes[i].length; j++) {
+                    if (keys[i].equals(attributes[i][j])) {
+                        trainingData[l][i] = j;
+                        break;
+                    }
                 }
             }
-        }
-        for (int i = 0; i < classes.length; i++) {
-            if (keys[keys.length - 1].equals(classes[i])) {
-                trainingData[l][keys.length - 1] = i;
-                break;
+            for (int i = 0; i < classes.length; i++) {
+                if (keys[keys.length - 1].equals(classes[i])) {
+                    trainingData[l][keys.length - 1] = i;
+                    break;
+                }
             }
         }
     }
@@ -96,12 +104,27 @@ public class DecisionTree {
         DecisionTree d = new DecisionTree(classes, attributes, trainingData, attributeNames); //create new decision tree with car_data
         d.ID3(); //run ID3 algorithm to build up the tree
         System.out.println("Writing XML File...");
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter("test.xml"))) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("car_tree.xml"))) {
             writer.write(d.toXML());
             writer.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        System.out.println("Checking Test Examples...");
+        for (int[] aTrainingData : trainingData) {
+            if (d.decide(aTrainingData) != aTrainingData[attributes.length])
+                System.out.println("failed");
+        }
+    }
+
+    /**
+     * uses the decision tree to decide which class fits the attributes best
+     *
+     * @param attributes attributes to check
+     * @return class
+     */
+    public int decide(int[] attributes) {
+        return root.getClass_(attributes);
     }
 
     /**
@@ -170,7 +193,7 @@ public class DecisionTree {
      * @return a new node that parts the given training examples best according to information gain
      */
     private Node getNodeWithMostGain(ArrayList<Integer> chosenOnes, double entropyOfChosen, InternalNode parent) {
-        if (entropyOfChosen == 0) {
+        if (entropyOfChosen == 0) { //that means the given set is perfectly classified
             assert trainingData.length > 0;
             return new LeafNode(trainingData[chosenOnes.get(0)][attributes.length], chosenOnes, parent);
         } else {
@@ -205,11 +228,12 @@ public class DecisionTree {
                 InternalNode current = (InternalNode) workingQueue.poll();
                 for (int i = 0; i < attributes[current.my_attribute].length; i++) {
                     ArrayList<ArrayList<Integer>> chosenbyAttribute = seperateByAttribute(current.chosenOnes, current.my_attribute);
+                    //create descendants for each value with decision attributes to maximise information gain
                     current.children[i] = getNodeWithMostGain(chosenbyAttribute.get(i), getEntropy(chosenbyAttribute.get(i)), current);
                     workingQueue.add(current.children[i]);
                     //System.out.println("added Node " + current.children[i]);
                 }
-            } else {
+            } else { //skip finished leaf nodes
                 workingQueue.poll();
             }
         }
@@ -223,42 +247,42 @@ public class DecisionTree {
     public String toXML() {
         StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n");
 
-        sb.append(nodeToXML(root, 0, 0)).append("\n");
-        if (root.getClass() == InternalNode.class) {
+        sb.append(nodeToXML(root, 0, 0)).append("\n"); //root node gets some special handling
+        if (root.getClass() == InternalNode.class) { //if the whole tree is just a leaf, we don't need a stack and tab handling at all
             int numtabs = 0;
-            Stack<Node> working_stack = new Stack<>();
-            Stack<Integer> attrValStack = new Stack<>();
-            InternalNode current = (InternalNode) root;
+            Stack<Node> working_stack = new Stack<>(); //stack to hold the leaf nodes (and closing tokens)
+            Stack<Integer> attrValStack = new Stack<>(); //stack to hold the attribute values of the nodes
+            InternalNode rootInternal = (InternalNode) root;
 
-            for (int i = 0; i < current.children.length; i++) {
-                working_stack.push(current.children[i]);
+            for (int i = 0; i < rootInternal.children.length; i++) {
+                working_stack.push(rootInternal.children[i]);
                 attrValStack.push(i);
             }
-            numtabs++;
+            numtabs++; //one level up
             while (!working_stack.isEmpty()) {
-                if (working_stack.peek() == null) {
+                if (working_stack.peek() == null) { //here, we use null as a closing token
                     working_stack.pop();
-                    numtabs--;
-                    for (int i = 0; i < numtabs; i++) {
+                    numtabs--; //one level up
+                    for (int i = 0; i < numtabs; i++) { //tab handling
                         sb.append("\t");
                     }
-                    sb.append("</node>\n");
-                } else if (working_stack.peek().getClass() == InternalNode.class) {
+                    sb.append("</node>\n"); //insert actual closing tag
+                } else if (working_stack.peek().getClass() == InternalNode.class) { //internal nodes have children to consider
                     InternalNode c = (InternalNode) working_stack.pop();
                     sb.append(nodeToXML(c, attrValStack.pop(), numtabs)).append("\n");
-                    numtabs++;
-                    working_stack.push(null);
+                    numtabs++; //one level down
+                    working_stack.push(null); //push closing token
                     for (int i = 0; i < c.children.length; i++) {
                         working_stack.push(c.children[i]);
                         attrValStack.push(i);
                     }
-                } else {
+                } else { //leaf nodes have to be printed along with their class names
                     LeafNode c = (LeafNode) working_stack.pop();
                     sb.append(nodeToXML(c, attrValStack.pop(), numtabs)).append(classes[c.my_class]).append("</node>\n");
                 }
             }
         }
-        sb.append("</tree>");
+        sb.append("</tree>"); //closing the root node
         return sb.toString();
     }
 
@@ -273,13 +297,14 @@ public class DecisionTree {
     private String nodeToXML(Node n, int attr_value, int numTabs) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < numTabs; i++) {
-            sb.append("\t");
+            sb.append("\t"); //place tabs where necessary
         }
         if (n.parent == null) {
             sb.append("<tree");
         } else {
             sb.append("<node");
         }
+        //build classes part of the string
         sb.append(" classes=\"");
         ArrayList<String> classStrings = new ArrayList<>();
         for (int i = 0; i < this.classes.length; i++) {
@@ -287,13 +312,15 @@ public class DecisionTree {
                 classStrings.add(classes[i] + ":" + n.classDistribution[i]);
             }
         }
+        //comma handling
         sb.append(classStrings.get(0));
         for (int i = 1; i < classStrings.size(); i++) {
             sb.append(",");
             sb.append(classStrings.get(i));
         }
+        //entropy part of the string
         sb.append("\" entropy=\"").append(n.entropyOfChosen).append("\"");
-        if (n.parent != null) {
+        if (n.parent != null) { //if n is not the root node, print attribute value
             sb.append(' ').append(attributeNames[n.parent.my_attribute]).append("=\"").append(attributes[n.parent.my_attribute][attr_value]).append("\"");
         }
         sb.append(">");
@@ -308,6 +335,7 @@ public class DecisionTree {
         ArrayList<Integer> chosenOnes;
         int[] classDistribution;
         double entropyOfChosen;
+
         /**
          * basic initialization for nodes
          *
