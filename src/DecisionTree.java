@@ -1,4 +1,6 @@
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Stack;
@@ -8,10 +10,13 @@ import java.util.Stack;
  * It is used in it's main method to solve the P.3 programming assignment for the Machine Learning module.
  * <p>
  * The most important methods are:
- * public void ID3()
- * private double getEntropy(*)
- * private double getInformationGain(*)
- * private Node getNodeWithMostGain(*)
+ * <ul>
+ * <li>public void ID3()</li>
+ * <li>private double getEntropy(*)</li>
+ * <li>private double getInformationGain(*)</li>
+ * <li>private Node getNodeWithMostGain(*)</li>
+ * </ul>
+ * <p>
  * <p>
  * written by Maximilian Deubel
  */
@@ -37,34 +42,7 @@ public class DecisionTree {
         this.attributeNames = attributeNames;
     }
 
-    /**
-     * loads a line from the .data file to an entry of the trainingData array
-     *
-     * @param line         input string
-     * @param classes      classes for string comparison
-     * @param attributes   attributes for string comparison
-     * @param trainingData array to save training examples
-     * @param l            current line number
-     */
-    private static void loadLine(String line, String[] classes, String[][] attributes, int[][] trainingData, int l) {
-        String[] keys = line.split(",");
-        if (keys.length == attributes.length + 1) {
-            for (int i = 0; i < attributes.length; i++) {
-                for (int j = 0; j < attributes[i].length; j++) {
-                    if (keys[i].equals(attributes[i][j])) {
-                        trainingData[l][i] = j;
-                        break;
-                    }
-                }
-            }
-            for (int i = 0; i < classes.length; i++) {
-                if (keys[keys.length - 1].equals(classes[i])) {
-                    trainingData[l][keys.length - 1] = i;
-                    break;
-                }
-            }
-        }
-    }
+
 
     /**
      * entry point
@@ -73,35 +51,9 @@ public class DecisionTree {
      * @param args not used
      */
     public static void main(String[] args) {
-        //load the car_data examples
-        String[] classes = new String[]{
-                "unacc", "acc", "good", "vgood"
-        };
-        String[][] attributes = new String[][]{
-                {"vhigh", "high", "med", "low"},
-                {"vhigh", "high", "med", "low"},
-                {"2", "3", "4", "5more"},
-                {"2", "4", "more"},
-                {"small", "med", "big"},
-                {"low", "med", "high"}
-        };
-        String[] attributeNames = {"buying", "maint", "doors", "persons", "lug_boot", "safety"};
-        int[][] trainingData = new int[1728][attributes.length + 1];
-        System.out.println("Loading Training Data...");
-        try {
-            try (BufferedReader br = new BufferedReader(new FileReader("car.data"))) {
-                int i = 0;
-                String line = br.readLine();
-                while (line != null) {
-                    loadLine(line, classes, attributes, trainingData, i++);
-                    line = br.readLine();
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        LoadC4_5.CarData carData = new LoadC4_5.CarData();
         System.out.println("Creating Decision Tree via ID3...");
-        DecisionTree d = new DecisionTree(classes, attributes, trainingData, attributeNames); //create new decision tree with car_data
+        DecisionTree d = new DecisionTree(carData.classes, carData.attributes, carData.trainingData, carData.attributeNames); //create new decision tree with car_data
         d.ID3(); //run ID3 algorithm to build up the tree
         System.out.println("Writing XML File...");
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("car_tree.xml"))) {
@@ -111,8 +63,8 @@ public class DecisionTree {
             e.printStackTrace();
         }
         System.out.println("Checking Test Examples...");
-        for (int[] aTrainingData : trainingData) {
-            if (d.decide(aTrainingData) != aTrainingData[attributes.length])
+        for (int[] aTrainingData : carData.trainingData) {
+            if (d.decide(aTrainingData) != aTrainingData[carData.attributes.length])
                 System.out.println("failed");
         }
     }
