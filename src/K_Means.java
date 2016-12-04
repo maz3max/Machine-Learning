@@ -1,4 +1,10 @@
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.Random;
 
 /**
  * Created by max on 01.12.16.
@@ -30,19 +36,67 @@ public class K_Means {
         k_means();
     }
 
+    public K_Means(double[][] trainingData, int k) {
+        this.trainingData = trainingData;
+        double[] min = new double[trainingData[0].length];
+        double[] max = new double[trainingData[0].length];
+
+        for (int i = 0; i < trainingData[0].length; i++) {
+            min[i] = Double.POSITIVE_INFINITY;
+            max[i] = Double.NEGATIVE_INFINITY;
+        }
+        for (int i = 0; i < trainingData.length; i++) {
+            for (int j = 0; j < trainingData[0].length; j++) {
+                if (trainingData[i][j] < min[j]) min[j] = trainingData[i][j];
+                if (trainingData[i][j] > max[j]) max[j] = trainingData[i][j];
+            }
+        }
+        this.centers = new double[k][trainingData[0].length];
+        findRandomCenters(min, max);
+        k_means();
+    }
+
     /**
      * Entry point
      *
      * @param args one integer to specify k
      */
     public static void main(String[] args) {
-        LoadC4_5.CarData carData = new LoadC4_5.CarData();
-        int k = 4;
-        if (args.length == 1 && args[0].chars().allMatch(Character::isDigit)) {
-            k = Integer.parseInt(args[0]);
+        int nCenters = 5;
+        int nPPC = 10000;
+        int boundary = 500;
+        int sDeviation = 80;
+        TestDataSet t = new TestDataSet(nCenters, nPPC, boundary, sDeviation);
+        K_Means k_means = new K_Means(t.trainingData, nCenters);
+
+        BufferedImage image = new BufferedImage(2 * (boundary + sDeviation), 2 * (boundary + sDeviation), BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D grc = image.createGraphics();
+        grc.setColor(Color.WHITE);
+        for (int i = 0; i < t.trainingData.length; i++) {
+            grc.fillOval((int) Math.round(t.trainingData[i][0] - 1) + boundary + sDeviation, (int) Math.round(t.trainingData[i][1] - 1) + boundary + sDeviation, 2, 2);
         }
-        K_Means k_means = new K_Means(carData.attributes, carData.trainingData, k);
-        System.out.println(Arrays.deepToString(k_means.getCenterStats(carData.classes)));
+        grc.setColor(Color.GREEN);
+        for (int i = 0; i < t.centers.length; i++) {
+            grc.fillOval(Math.round(t.centers[i][0] - 4) + boundary + sDeviation, Math.round(t.centers[i][1] - 4) + boundary + sDeviation, 8, 8);
+        }
+        grc.setColor(Color.RED);
+        for (int i = 0; i < k_means.centers.length; i++) {
+            grc.fillOval((int) Math.round(k_means.centers[i][0] - 4) + boundary + sDeviation, (int) Math.round(k_means.centers[i][1] - 4) + boundary + sDeviation, 8, 8);
+        }
+        try {
+            ImageIO.write(image, "png", new File("out.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void findRandomCenters(double[] min, double[] max) {
+        Random rnd = new Random();
+        for (int i = 0; i < centers.length; i++) {
+            for (int j = 0; j < centers[0].length; j++) {
+                centers[i][j] = rnd.nextDouble() * (max[j] - min[j]) + min[j];
+            }
+        }
     }
 
     /**
@@ -140,7 +194,7 @@ public class K_Means {
             double min = Double.POSITIVE_INFINITY;
             int minIndex = 0;
             for (int j = 0; j < centers.length; j++) {
-                double current = euclideanSquared(trainingData[i], trainingData[j]);
+                double current = euclideanSquared(trainingData[i], centers[j]);
                 if (current < min) {
                     min = current;
                     minIndex = j;
