@@ -1,11 +1,24 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.util.Arrays;
 
 /**
  * Created by max on 01.12.16.
  */
 public class LoadC4_5 {
+    public static void main(String[] Args) {
+        CarData c = new CarData();
+        try (BufferedWriter w = new BufferedWriter(new FileWriter("cardata.pat"))) {
+            for (int i = 0; i < c.trainingData.length; i++) {
+                w.write("\n" + c.trainingData[i][0]);
+                for (int j = 1; j < c.trainingData[i].length; j++) {
+                    w.write(" " + c.trainingData[i][j]);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
 
     /**
      * loads a line from the .data file to an entry of the trainingData array
